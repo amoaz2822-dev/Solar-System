@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مستكشف الكون - محاكاة النظام الشمسي</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0d1a, #1a1a2e);
+            color: #e6e6ff;
+            overflow: hidden;
+            height: 100vh;
+            direction: rtl;
+        }
+        
+        #app-container {
+            display: flex;
+            height: 100vh;
+            transition: all 0.5s ease;
+        }
+        
+        #left-sidebar {
+            width: 280px;
+            background: rgba(18, 25, 45, 0.85);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(100, 150, 255, 0.3);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            transition: transform 0.5s ease;
+            z-index: 100;
+        }
+        
+        #right-sidebar {
+            width: 320px;
+            background: rgba(18, 25, 45, 0.85);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(100, 150, 255, 0.3);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            transition: transform 0.5s ease;
+            z-index: 100;
+        }
+        
+        #simulation-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.5s ease;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sidebar-section {
+            background: rgba(30, 40, 70, 0.7);
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            border-radius: 16px;
+            padding: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        
+        .sidebar-section h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #8a9bff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .sidebar-section h2::after {
+            content: "▼";
+            font-size: 14px;
+            color: #64f3ff;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-section.collapsed h2::after {
+            transform: rotate(180deg);
+        }
+        
+        #info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        #info-panel h1 {
+            font-size: 24px;
+            text-align: center;
+            background: linear-gradient(45deg, #6a5af9, #9c69ff, #64f3ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        #info-panel p {
+            line-height: 1.6;
+            color: #c5c9ff;
+            text-align: justify;
+            font-size: 14px;
+        }
+        
+        #info-panel .subtitle {
+            color: #64f3ff;
+            font-weight: 600;
+            margin: 8px 0;
+            display: block;
+        }
+        
+        #info-panel .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(100, 150, 255, 0.15);
+        }
+        
+        #info-panel .data-row:last-child {
+            border-bottom: none;
+        }
+        
+        #info-panel .label {
+            color: #8a9bff;
+        }
+        
+        #info-panel .value {
+            color: #e6e6ff;
+            font-weight: 500;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: rgba(18, 25, 45, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+        }
+        
+        .control-btn {
+            background: rgba(30, 40, 70, 0.9);
+            border: 1px solid rgba(100, 150, 255, 0.4);
+            color: #8a9bff;
+            padding: 6px 14px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        
+        .control-btn:hover {
+            background: rgba(45, 60, 100, 0.95);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(100, 150, 255, 0.3);
+        }
+        
+        .control-btn:active {
+            transform: translateY(0);
+        }
+        
+        .control-btn.speed {
+            background: rgba(35, 25, 55, 0.9);
+            border-color: rgba(180, 100, 255, 0.4);
+            color: #c98bff;
+        }
+        
+        .control-btn.speed:hover {
+            background: rgba(50, 35, 80, 0.95);
+            box-shadow: 0 4px 15px rgba(180, 100, 255, 0.3);
+        }
+        
+        #json-editor-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(35, 25, 55, 0.9);
+            border: 1px solid rgba(180, 100, 255, 0.4);
+            color: #c98bff;
+            padding: 10px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 200;
+            box-shadow: 0 4px 15px rgba(180, 100, 255, 0.3);
+        }
+        
+        #json-editor-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(180, 100, 255, 0.5);
+        }
+        
+        #json-editor-btn::before {
+            content: "⚙️";
+        }
+        
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0c0e1d, #1a1a2e);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+        
+        #loading-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 8px solid rgba(100, 150, 255, 0.2);
+            border-top: 8px solid #64f3ff;
+            border-radius: 50%;
+            animation: spin 1.2s linear infinite;
+            margin-bottom: 30px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #loading-text {
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(45deg, #6a5af9, #9c69ff, #64f3ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        #instructions ul {
+            padding-right: 20px;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+        
+        #instructions li {
+            margin-bottom: 8px;
+            text-align: right;
+        }
+        
+        .highlight {
+            color: #8a9bff;
+            font-weight: 500;
+        }
+        
+        #planet-selector .planet-option {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(30, 40, 70, 0.6);
+            flex-direction: row-reverse;
+        }
+        
+        #planet-selector .planet-option:hover {
+            background: rgba(45, 60, 100, 0.8);
+            transform: translateX(-5px);
+        }
+        
+        #planet-selector .planet-option.selected {
+            background: rgba(100, 150, 255, 0.25);
+            border-right: 4px solid #64f3ff;
+        }
+        
+        .planet-color {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            margin-left: 12px;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .planet-label {
+            position: absolute;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            z-index: 200;
+        }
+        
+        #credit {
+            margin-top: auto;
+            padding: 12px;
+            background: rgba(25, 35, 60, 0.7);
+            border-radius: 12px;
+            text-align: center;
+            font-size: 14px;
+            border: 1px solid rgba(100, 150, 255, 0.2);
+        }
+        
+        #credit::before {
+            content: "✨";
+            margin-left: 8px;
+        }
+        
+        /* JSON Editor Modal */
+        #json-editor-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 5, 15, 0.95);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.4s ease;
+        }
+        
+        #json-editor-modal.visible {
+            display: flex;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: rgba(20, 28, 50, 0.95);
+            border: 1px solid rgba(100, 150, 255, 0.4);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 1200px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.7);
+            transform: translateY(20px);
+            animation: slideUp 0.5s ease forwards;
+        }
+        
+        @keyframes slideUp {
+            to { transform: translateY(0); }
+        }
+        
+        .modal-header {
+            padding: 15px 25px;
+            border-bottom: 1px solid rgba(100, 150, 255, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            font-size: 24px;
+            background: linear-gradient(45deg, #6a5af9, #9c69ff, #64f3ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 700;
+        }
+        
+        .close-modal {
+            background: rgba(30, 40, 70, 0.8);
+            border: 1px solid rgba(180, 100, 255, 0.4);
+            color: #c98bff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .close-modal:hover {
+            background: rgba(50, 35, 80, 0.9);
+            transform: rotate(90deg);
+        }
+        
+        .modal-body {
+            padding: 20px;
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #json-editor-textarea {
+            flex: 1;
+            background: rgba(10, 15, 30, 0.9);
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            border-radius: 12px;
+            color: #e6e6ff;
+            font-family: 'Courier New', monospace;
+            font-size: 15px;
+            padding: 15px;
+            resize: none;
+            direction: ltr;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        
+        #json-editor-textarea:focus {
+            outline: none;
+            border-color: rgba(100, 200, 255, 0.6);
+            box-shadow: 0 0 15px rgba(100, 150, 255, 0.3);
+        }
+        
+        .modal-footer {
+            padding: 15px 25px;
+            border-top: 1px solid rgba(100, 150, 255, 0.3);
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+        }
+        
+        .modal-btn {
+            padding: 10px 25px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 16px;
+        }
+        
+        .save-btn {
+            background: linear-gradient(45deg, #4b6cb7, #182848);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(75, 108, 183, 0.4);
+        }
+        
+        .save-btn:hover {
+            background: linear-gradient(45deg, #5a7bc7, #283858);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(75, 108, 183, 0.6);
+        }
+        
+        .cancel-btn {
+            background: rgba(30, 40, 70, 0.8);
+            color: #8a9bff;
+            border: 1px solid rgba(100, 150, 255, 0.4);
+        }
+        
+        .cancel-btn:hover {
+            background: rgba(45, 60, 100, 0.9);
+            transform: translateY(-2px);
+        }
+        
+        .json-key {
+            color: #ff9e64;
+        }
+        
+        .json-string {
+            color: #4ce88e;
+        }
+        
+        .json-number {
+            color: #64b5f6;
+        }
+        
+        .json-boolean {
+            color: #e06c75;
+        }
+        
+        .editor-toolbar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 0 5px;
+        }
+        
+        .format-btn {
+            background: rgba(30, 40, 70, 0.8);
+            border: 1px solid rgba(100, 150, 255, 0.4);
+            color: #8a9bff;
+            padding: 6px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+        
+        .format-btn:hover {
+            background: rgba(45, 60, 100, 0.9);
+        }
+        
+        .validation-status {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .valid {
+            background: rgba(76, 232, 142, 0.15);
+            color: #4ce88e;
+            border: 1px solid rgba(76, 232, 142, 0.3);
+        }
+        
+        .invalid {
+            background: rgba(224, 108, 117, 0.15);
+            color: #e06c75;
+            border: 1px solid rgba(224, 108, 117, 0.3);
+        }
+        
+        #error-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(100, 30, 30, 0.9);
+            color: #ffcccc;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 80%;
+            text-align: center;
+            z-index: 10000;
+            display: none;
+            box-shadow: 0 0 20px rgba(255, 100, 100, 0.5);
+            direction: rtl;
+        }
+        
+        #error-message.visible {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @media (max-width: 1100px) {
+            #app-container {
+                flex-direction: column;
+            }
+            
+            #left-sidebar, #right-sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 40vh;
+                border-right: none;
+                border-left: none;
+                border-bottom: 1px solid rgba(100, 150, 255, 0.3);
+            }
+            
+            #simulation-container {
+                height: 50vh;
+            }
+            
+            #controls {
+                bottom: 15px;
+                flex-wrap: wrap;
+                padding: 8px 15px;
+            }
+            
+            .control-btn {
+                padding: 5px 10px;
+                font-size: 13px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            #left-sidebar, #right-sidebar {
+                max-height: 30vh;
+                padding: 15px;
+            }
+            
+            #simulation-container {
+                height: 60vh;
+            }
+            
+            .sidebar-section h2 {
+                font-size: 18px;
+            }
+            
+            #json-editor-btn {
+                padding: 8px 14px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div id="loading-text">جارٍ تهيئة محاكاة الكون</div>
+    </div>
+    
+    <div id="error-message">
+        <h2>⚠️ خطأ في محاكاة النظام ثلاثي الأبعاد</h2>
+        <p>تعذر تهيئة محاكاة النظام الشمسي ثلاثية الأبعاد. قد يكون ذلك بسبب:</p>
+        <ul style="text-align: right; margin: 15px 0 0 20px;">
+            <li>متصفح قديم (يرجى استخدام كروم، فايرفوكس، أو إيدج)</li>
+            <li>جافاسكريبت أو WebGL معطل</li>
+            <li>إمكانات جهاز غير كافية</li>
+        </ul>
+        <p style="margin-top: 15px; font-weight: bold;">يرجى تحديث الصفحة أو تحديث متصفحك.</p>
+    </div>
+    
+    <div id="app-container">
+        <div id="left-sidebar">
+            <div class="sidebar-section" id="planet-selector-section">
+                <h2>🪐 اختيار الكوكب</h2>
+                <div id="planet-selector">
+                    <div class="planet-option selected" data-planet="sun">
+                        <div class="planet-color" style="background: #FFD700;"></div>
+                        <span>الشمس</span>
+                    </div>
+                    <div class="planet-option" data-planet="mercury">
+                        <div class="planet-color" style="background: #B7B7B7;"></div>
+                        <span>عطارد</span>
+                    </div>
+                    <div class="planet-option" data-planet="venus">
+                        <div class="planet-color" style="background: #E39E1C;"></div>
+                        <span>الزهرة</span>
+                    </div>
+                    <div class="planet-option" data-planet="earth">
+                        <div class="planet-color" style="background: #4B74C1;"></div>
+                        <span>الأرض</span>
+                    </div>
+                    <div class="planet-option" data-planet="mars">
+                        <div class="planet-color" style="background: #C1440E;"></div>
+                        <span>المريخ</span>
+                    </div>
+                    <div class="planet-option" data-planet="jupiter">
+                        <div class="planet-color" style="background: #D89E77;"></div>
+                        <span>المشتري</span>
+                    </div>
+                    <div class="planet-option" data-planet="saturn">
+                        <div class="planet-color" style="background: #E39E1C;"></div>
+                        <span>زحل</span>
+                    </div>
+                    <div class="planet-option" data-planet="uranus">
+                        <div class="planet-color" style="background: #A6C9C9;"></div>
+                        <span>أورانوس</span>
+                    </div>
+                    <div class="planet-option" data-planet="neptune">
+                        <div class="planet-color" style="background: #5B79CC;"></div>
+                        <span>نبتون</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-section" id="instructions-section">
+                <h2>🌌 دليل التنقل</h2>
+                <div id="instructions">
+                    <ul>
+                        <li><span class="highlight">اسحب</span> لتدوير المشهد</li>
+                        <li><span class="highlight">مرر</span> للتقريب/الابتعاد</li>
+                        <li><span class="highlight">زر الماوس الأيمن + اسحب</span> لتحريك المشهد</li>
+                        <li><span class="highlight">انقر</span> على أي كوكب لمعرفة المزيد</li>
+                        <li>استخدم <span class="highlight">عناصر التحكم</span> أدناه لضبط المحاكاة</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div id="credit">تم التطوير بواسطة Ziad Ayman Dev</div>
+        </div>
+        
+        <div id="simulation-container">
+            <!-- Three.js canvas will be inserted here -->
+        </div>
+        
+        <div id="right-sidebar">
+            <div class="sidebar-section">
+                <h2>معلومات الكوكب</h2>
+                <div id="info-panel">
+                    <h1>مستكشف الكون</h1>
+                    <p>مرحباً بك في محاكاة تفاعلية ثلاثية الأبعاد للنظام الشمسي. تعرض هذه المحاكاة الشمس وجميع الكواكب الثمانية مع مساراتها المدارية وحركاتها النسبية.</p>
+                    <p>انقر على أي جسم سماوي لمعرفة المزيد عن خصائصه وسماته. استخدم عناصر التحكم أدناه للتنقل وضبط سرعة المحاكاة.</p>
+                    
+                    <h2>نظرة عامة على النظام الشمسي</h2>
+                    <p>تكوّن النظام الشمسي قبل حوالي <span class="subtitle">4.6 مليار سنة</span> من الانهيار الجاذبي لسحابة جزيئية نجمية عملاقة بين النجوم. الغالبية العظمى من كتلة النظام موجودة في الشمس، ومعظم الكتلة المتبقية موجودة في كوكب المشتري.</p>
+                    
+                    <div class="data-row">
+                        <span class="label">العمر:</span>
+                        <span class="value">4.6 مليار سنة</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">القطر:</span>
+                        <span class="value">287.46 مليار كم</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">الكتلة:</span>
+                        <span class="value">1.0014 كتلة شمسية</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">الكواكب:</span>
+                        <span class="value">8 (حسب تعريف الاتحاد الفلكي الدولي)</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">الكواكب القزمة:</span>
+                        <span class="value">5+ معترف بها رسميًا</span>
+                    </div>
+                    
+                    <h2>الميكانيكا المدارية</h2>
+                    <p>تدور جميع الكواكب حول الشمس في مسارات إهليليجية وفقًا لـ <span class="subtitle">قوانين كبلر لحركة الكواكب</span>. تزداد الفترة المدارية مع البعد عن الشمس، حيث يكمل عطارد دورة واحدة في 88 يومًا أرضيًا فقط بينما يستغرق نبتون 165 عامًا أرضيًا.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" id="reset-view">
+            <span>❐</span> إعادة تعيين العرض
+        </button>
+        <button class="control-btn" id="toggle-orbits">
+            <span>⚬</span> إظهار/إخفاء المدارات
+        </button>
+        <button class="control-btn speed" id="speed-down">
+            <span>–</span> إبطاء
+        </button>
+        <button class="control-btn speed" id="speed-up">
+            <span>+</span> تسريع
+        </button>
+        <button class="control-btn" id="toggle-labels">
+            <span>Ⓐ</span> إظهار/إخفاء التسميات
+        </button>
+    </div>
+    
+    <button id="json-editor-btn">تحرير ملف البيانات</button>
+    
+    <div id="json-editor-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>محرر ملف JSON لبيانات الكواكب</h2>
+                <div class="close-modal" id="close-editor">&times;</div>
+            </div>
+            <div class="modal-body">
+                <div class="editor-toolbar">
+                    <div class="validation-status valid" id="validation-status">✓ JSON صالح</div>
+                    <button class="format-btn" id="format-json">تنسيق التعليمات البرمجية</button>
+                </div>
+                <textarea id="json-editor-textarea" spellcheck="false"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel-btn" id="cancel-edit">إلغاء</button>
+                <button class="modal-btn save-btn" id="save-edit">حفظ التغييرات</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // دالة معالجة الأخطاء
+        function showError(message) {
+            console.error("خطأ في النظام الشمسي:", message);
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('error-message').classList.add('visible');
+        }
+        
+        // التحقق من دعم WebGL
+        function isWebGLAvailable() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && 
+                         (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // متغيرات عامة للمحاكاة
+        let scene, camera, renderer, controls, solarSystem;
+        let planets = {};
+        let orbitLines = {};
+        let labels = {};
+        let animationFrameId = null;
+        let simulationSpeed = 1;
+        let labelsVisible = false;
+        let selectedPlanet = 'sun';
+        let currentPlanetData = null;
+        
+        // بيانات الكواكب الافتراضية
+        const defaultPlanetData = {
+            sun: {
+                radius: 25,
+                distance: 0,
+                color: 0xFFD700,
+                emissive: 0xFFA500,
+                emissiveIntensity: 1.5,
+                rotationSpeed: 0.001,
+                orbitalPeriod: 0,
+                info: {
+                    name: "الشمس",
+                    type: "نجم قزم أصفر من النوع G (G2V)",
+                    diameter: "1,392,700 كم (109 × قطر الأرض)",
+                    mass: "1.989 × 10³⁰ كغ (333,000 × كتلة الأرض)",
+                    temperature: "5,500°م (السطح)، 15 مليون °م (النواة)",
+                    composition: "74% هيدروجين، 24% هيليوم، 2% عناصر أثقل",
+                    age: "4.6 مليار سنة",
+                    gravity: "28 × جاذبية الأرض",
+                    dayLength: "25.38 يوم أرضي (عند خط الاستواء)",
+                    description: "الشمس هي النجم في مركز النظام الشمسي. إنها كرة شبه مثالية من البلازما الساخنة، تسخن حتى الابيضاض بواسطة تفاعلات الاندماج النووي في نواتها. تمثل الشمس 99.86% من كتلة النظام الشمسي."
+                }
+            },
+            mercury: {
+                radius: 3.5,
+                distance: 60,
+                color: 0xB7B7B7,
+                orbitalPeriod: 0.24,
+                rotationSpeed: 0.004,
+                inclination: 0.01,
+                info: {
+                    name: "عطارد",
+                    type: "كوكب أرضي",
+                    diameter: "4,879 كم (0.38 × قطر الأرض)",
+                    mass: "3.3011 × 10²³ كغ (0.055 × كتلة الأرض)",
+                    temperature: "-173°م إلى 427°م",
+                    moons: "0",
+                    dayLength: "58.6 يوم أرضي",
+                    yearLength: "88 يوم أرضي",
+                    composition: "نواة حديدية (70%)، وشاح وقشرة سيليكاتية",
+                    atmosphere: "رفيع للغاية (أكسجين، صوديوم، هيدروجين، هيليوم)",
+                    description: "عطارد هو أصغر كوكب وأقربه إلى الشمس في النظام الشمسي. سطحه مليء بالحفر بشكل كبير ويُشبه سطح القمر. بسبب عدم وجود غلاف جوي، تختلف درجات الحرارة بشكل كبير بين الليل والنهار."
+                }
+            },
+            venus: {
+                radius: 8.5,
+                distance: 90,
+                color: 0xE39E1C,
+                orbitalPeriod: 0.62,
+                rotationSpeed: -0.002,
+                inclination: 0.02,
+                info: {
+                    name: "الزهرة",
+                    type: "كوكب أرضي",
+                    diameter: "12,104 كم (0.95 × قطر الأرض)",
+                    mass: "4.8675 × 10²⁴ كغ (0.815 × كتلة الأرض)",
+                    temperature: "464°م (متوسط)",
+                    moons: "0",
+                    dayLength: "243 يوم أرضي (رجعي)",
+                    yearLength: "225 يوم أرضي",
+                    composition: "نواة حديدية، وشاح صخري، قشرة بازلتية",
+                    atmosphere: "96.5% ثاني أكسيد الكربون، 3.5% نيتروجين، سحب كثيفة من حمض الكبريتيك",
+                    description: "الزهرة هي أقرب جار كوكبي للأرض وأسخن كوكب في النظام الشمسي بسبب تأثير الدفيئة الشديد. سطحها مخفي بواسطة سحب كثيفة من حمض الكبريتيك، وتدور في الاتجاه المعاكس لمعظم الكواكب."
+                }
+            },
+            earth: {
+                radius: 9,
+                distance: 125,
+                color: 0x4B74C1,
+                orbitalPeriod: 1,
+                rotationSpeed: 0.02,
+                inclination: 0.41,
+                info: {
+                    name: "الأرض",
+                    type: "كوكب أرضي",
+                    diameter: "12,742 كم",
+                    mass: "5.972 × 10²⁴ كغ",
+                    temperature: "-88°م إلى 58°م (متوسط 15°م)",
+                    moons: "1 (القمر)",
+                    dayLength: "24 ساعة",
+                    yearLength: "365.25 يوم",
+                    composition: "نواة حديدية، وشاح سيليكاتي، قشرة",
+                    atmosphere: "78% نيتروجين، 21% أكسجين، 1% غازات أخرى",
+                    description: "الأرض هي الكوكب الثالث من الشمس والجسم الفلكي الوحيد المعروف باستضافة الحياة. حوالي 71% من سطح الأرض مغطى بالماء، وجوّها يحتوي على المزيج الصحيح من الغازات لدعم الحياة كما نعرفها."
+                }
+            },
+            mars: {
+                radius: 4.8,
+                distance: 170,
+                color: 0xC1440E,
+                orbitalPeriod: 1.88,
+                rotationSpeed: 0.018,
+                inclination: 0.45,
+                info: {
+                    name: "المريخ",
+                    type: "كوكب أرضي",
+                    diameter: "6,779 كم (0.53 × قطر الأرض)",
+                    mass: "6.4171 × 10²³ كغ (0.107 × كتلة الأرض)",
+                    temperature: "-125°م إلى 20°م",
+                    moons: "2 (فوبوس وديموس)",
+                    dayLength: "24.6 ساعة",
+                    yearLength: "687 يوم أرضي",
+                    composition: "نواة حديدية، وشاح سيليكاتي، قشرة بازلتية",
+                    atmosphere: "95% ثاني أكسيد الكربون، 2.6% نيتروجين، 1.9% أرجون",
+                    description: "يُعرف المريخ باسم 'الكوكب الأحمر' بسبب أكسيد الحديد (الصدأ) على سطحه. يحتوي على أكبر بركان في النظام الشمسي (أوليمبوس مونس)، وتشير أدلة الأنهار والبحيرات القديمة إلى أنه كان يحتوي على ماء سائل على سطحه في الماضي."
+                }
+            },
+            jupiter: {
+                radius: 20,
+                distance: 260,
+                color: 0xD89E77,
+                orbitalPeriod: 11.86,
+                rotationSpeed: 0.04,
+                inclination: 0.05,
+                info: {
+                    name: "المشتري",
+                    type: "عملاق غازي",
+                    diameter: "139,820 كم (11.2 × قطر الأرض)",
+                    mass: "1.8982 × 10²⁷ كغ (318 × كتلة الأرض)",
+                    temperature: "-145°م (قمم السحب)",
+                    moons: "95+ مؤكد",
+                    dayLength: "9.9 ساعة",
+                    yearLength: "11.86 سنة أرضية",
+                    composition: "90% هيدروجين، 10% هيليوم، آثار من الميثان وبخار الماء",
+                    atmosphere: "هيدروجين، هيليوم، ميثان، بلورات أمونيا",
+                    description: "المشتري هو أكبر كوكب في النظام الشمسي، بكتلة أكبر مرتين من كتلة جميع الكواكب الأخرى مجتمعة. يشتهر ببقعته الحمراء العظمى، وهي عاصفة عملاقة أكبر من الأرض تجتاح منذ قرون. لديه نظام حلقات خافت و95 قمر على الأقل."
+                }
+            },
+            saturn: {
+                radius: 17,
+                distance: 360,
+                color: 0xE39E1C,
+                orbitalPeriod: 29.46,
+                rotationSpeed: 0.036,
+                inclination: 0.44,
+                hasRings: true,
+                info: {
+                    name: "زحل",
+                    type: "عملاق غازي",
+                    diameter: "116,460 كم (9.45 × قطر الأرض)",
+                    mass: "5.6834 × 10²⁶ كغ (95 × كتلة الأرض)",
+                    temperature: "-178°م (قمم السحب)",
+                    moons: "146+ مؤكد",
+                    dayLength: "10.7 ساعة",
+                    yearLength: "29.46 سنة أرضية",
+                    composition: "96% هيدروجين، 3% هيليوم، 1% عناصر أخرى",
+                    atmosphere: "هيدروجين، هيليوم، آثار من الميثان والأمونيا",
+                    description: "يُشتهر زحل بنظام حلقاته المذهل، المكون في الغالب من جزيئات جليدية مع بعض الحطام الصخري. على الرغم من حجمه الهائل، فإن زحل لديه أقل كثافة بين جميع الكواكب - سيعوم في الماء لو وُجد محيط كبير بما يكفي. أكبر أقماره، تيتان، يحتوي على غلاف جوي سميك وبحيرات من الميثان السائل."
+                }
+            },
+            uranus: {
+                radius: 12,
+                distance: 450,
+                color: 0xA6C9C9,
+                orbitalPeriod: 84.01,
+                rotationSpeed: -0.03,
+                inclination: 1.71,
+                info: {
+                    name: "أورانوس",
+                    type: "عملاق جليدي",
+                    diameter: "50,724 كم (4 × قطر الأرض)",
+                    mass: "8.6810 × 10²⁵ كغ (14.5 × كتلة الأرض)",
+                    temperature: "-224°م (متوسط)",
+                    moons: "27 مؤكد",
+                    dayLength: "17.2 ساعة (رجعي)",
+                    yearLength: "84 سنة أرضية",
+                    composition: "وشاح جليدي (ماء، أمونيا، ميثان)، نواة صخرية صغيرة",
+                    atmosphere: "83% هيدروجين، 15% هيليوم، 2% ميثان",
+                    description: "أورانوس فريد من بين الكواكب لدورانه على جانبه، مع ميل محوري 98°. هذا يسبب فصولاً شديدة تدوم أكثر من 20 عامًا لكل منها. لونه الأزرق المخضر يأتي من الميثان في غلافه الجوي الذي يمتص الضوء الأحمر. لديه نظام حلقات خافت و27 قمر معروف سميت على أسماء شخصيات شكسبير."
+                }
+            },
+            neptune: {
+                radius: 11.5,
+                distance: 550,
+                color: 0x5B79CC,
+                orbitalPeriod: 164.8,
+                rotationSpeed: 0.032,
+                inclination: 0.48,
+                info: {
+                    name: "نبتون",
+                    type: "عملاق جليدي",
+                    diameter: "49,244 كم (3.88 × قطر الأرض)",
+                    mass: "1.02413 × 10²⁶ كغ (17.1 × كتلة الأرض)",
+                    temperature: "-214°م (متوسط)",
+                    moons: "14 مؤكد",
+                    dayLength: "16.1 ساعة",
+                    yearLength: "165 سنة أرضية",
+                    composition: "وشاح جليدي (ماء، أمونيا، ميثان)، نواة صخرية صغيرة",
+                    atmosphere: "80% هيدروجين، 19% هيليوم، 1.5% ميثان",
+                    description: "نبتون هو أكثر الكواكب رياحًا في النظام الشمسي، مع رياح تفوق سرعة الصوت تصل إلى 2,100 كم/ساعة. تم اكتشافه من خلال التنبؤات الرياضية بدلاً من الملاحظة المباشرة. لونه الأزرق الداكن يأتي من الميثان الذي يمتص الضوء الأحمر. أكبر أقماره، تريتون، يدور في الاتجاه المعاكس لدوران الكوكب."
+                }
+            }
+        };
+        
+        // دالة لتنظيف موارد Three.js
+        function cleanupScene() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            if (renderer) {
+                renderer.dispose();
+                renderer = null;
+            }
+            
+            if (scene) {
+                // تنظيف المواد والهندسات
+                scene.traverse(object => {
+                    if (object.geometry) object.geometry.dispose();
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach(material => material.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
+                    }
+                });
+                scene = null;
+            }
+            
+            // إزالة الكاميرا والضوابط
+            camera = null;
+            controls = null;
+            solarSystem = null;
+            planets = {};
+            orbitLines = {};
+            labels = {};
+            
+            // إزالة العناصر القماشية القديمة
+            const container = document.getElementById('simulation-container');
+            while (container.firstChild) {
+                container.removeChild(container.firstChild);
+            }
+        }
+        
+        // دالة لتهيئة النظام الشمسي
+        function initSolarSystem(planetData) {
+            try {
+                // تنظيف المشهد الحالي إذا وجد
+                cleanupScene();
+                
+                // حفظ بيانات الكواكب الحالية
+                currentPlanetData = planetData;
+                
+                // إعداد المشهد
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0a1a);
+                scene.fog = new THREE.Fog(0x0a0a1a, 150, 3000);
+                
+                // إعداد الكاميرا
+                const container = document.getElementById('simulation-container');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 10000);
+                camera.position.set(0, 100, 300);
+                
+                // إعداد المُصيّر
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.shadowMap.enabled = true;
+                container.appendChild(renderer.domElement);
+                
+                // الإضاءة
+                const ambientLight = new THREE.AmbientLight(0x222233, 0.6);
+                scene.add(ambientLight);
+                
+                // ضوء الشمس
+                const sunLight = new THREE.PointLight(0xffffff, 2.5, 10000);
+                sunLight.position.set(0, 0, 0);
+                sunLight.castShadow = true;
+                scene.add(sunLight);
+                
+                // التحكم في المدار
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.screenSpacePanning = false;
+                controls.minDistance = 50;
+                controls.maxDistance = 3000;
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.2;
+                
+                // خلفية حقل النجوم
+                const starsGeometry = new THREE.BufferGeometry();
+                const starsMaterial = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 0.8,
+                    sizeAttenuation: true
+                });
+                
+                const starsVertices = [];
+                for (let i = 0; i < 15000; i++) {
+                    const x = (Math.random() - 0.5) * 4000;
+                    const y = (Math.random() - 0.5) * 4000;
+                    const z = (Math.random() - 0.5) * 4000;
+                    starsVertices.push(x, y, z);
+                }
+                
+                starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+                const starField = new THREE.Points(starsGeometry, starsMaterial);
+                scene.add(starField);
+                
+                // إنشاء مجموعة النظام الشمسي
+                solarSystem = new THREE.Group();
+                scene.add(solarSystem);
+                
+                // إنشاء الشمس
+                const sunGeometry = new THREE.SphereGeometry(planetData.sun.radius, 64, 64);
+                const sunMaterial = new THREE.MeshPhongMaterial({
+                    color: planetData.sun.color,
+                    emissive: planetData.sun.emissive,
+                    emissiveIntensity: planetData.sun.emissiveIntensity,
+                    shininess: 30
+                });
+                const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+                sun.position.set(0, 0, 0);
+                sun.castShadow = true;
+                solarSystem.add(sun);
+                planets.sun = sun;
+                
+                // إنشاء تسمية للشمس
+                const sunLabel = document.createElement('div');
+                sunLabel.className = 'planet-label';
+                sunLabel.textContent = 'الشمس';
+                sunLabel.style.color = '#FFD700';
+                sunLabel.style.backgroundColor = 'rgba(30, 40, 70, 0.8)';
+                sunLabel.style.border = '1px solid rgba(255, 215, 0, 0.3)';
+                sunLabel.style.display = 'none';
+                document.body.appendChild(sunLabel);
+                labels.sun = sunLabel;
+                
+                // إنشاء الكواكب والمدارات
+                Object.keys(planetData).forEach(planetName => {
+                    if (planetName === 'sun') return;
+                    
+                    const data = planetData[planetName];
+                    
+                    // إنشاء خط المدار
+                    const orbitGeometry = new THREE.BufferGeometry();
+                    const orbitVertices = [];
+                    const segments = 128;
+                    
+                    for (let i = 0; i <= segments; i++) {
+                        const theta = (i / segments) * Math.PI * 2;
+                        orbitVertices.push(
+                            Math.cos(theta) * data.distance,
+                            Math.sin(theta) * data.inclination * data.distance * 0.1,
+                            Math.sin(theta) * data.distance
+                        );
+                    }
+                    
+                    orbitGeometry.setAttribute('position', new THREE.Float32BufferAttribute(orbitVertices, 3));
+                    const orbitMaterial = new THREE.LineBasicMaterial({ 
+                        color: 0x4466aa, 
+                        transparent: true, 
+                        opacity: 0.6
+                    });
+                    const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
+                    solarSystem.add(orbitLine);
+                    orbitLines[planetName] = orbitLine;
+                    
+                    // إنشاء الكوكب
+                    const planetGeometry = new THREE.SphereGeometry(data.radius, 48, 48);
+                    const planetMaterial = new THREE.MeshPhongMaterial({
+                        color: data.color,
+                        shininess: 35
+                    });
+                    
+                    // مادة خاصة للعمالقة الغازية
+                    if (planetName === 'jupiter' || planetName === 'saturn' || planetName === 'uranus' || planetName === 'neptune') {
+                        planetMaterial.shininess = 15;
+                    }
+                    
+                    const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+                    planet.position.set(data.distance, 0, 0);
+                    planet.castShadow = true;
+                    planet.userData = { name: planetName };
+                    solarSystem.add(planet);
+                    planets[planetName] = planet;
+                    
+                    // إنشاء حلقات زحل إذا لزم الأمر
+                    if (data.hasRings) {
+                        const ringGeometry = new THREE.RingGeometry(data.radius * 1.5, data.radius * 2.8, 64);
+                        const ringMaterial = new THREE.MeshPhongMaterial({
+                            color: 0xE39E1C,
+                            transparent: true,
+                            opacity: 0.7,
+                            side: THREE.DoubleSide,
+                            shininess: 10
+                        });
+                        const rings = new THREE.Mesh(ringGeometry, ringMaterial);
+                        rings.rotation.x = Math.PI / 2;
+                        rings.rotation.z = 0.2;
+                        planet.add(rings);
+                    }
+                    
+                    // إنشاء تسمية للكوكب
+                    const label = document.createElement('div');
+                    label.className = 'planet-label';
+                    label.textContent = planetName === 'sun' ? 'الشمس' : 
+                                      planetName === 'mercury' ? 'عطارد' :
+                                      planetName === 'venus' ? 'الزهرة' :
+                                      planetName === 'earth' ? 'الأرض' :
+                                      planetName === 'mars' ? 'المريخ' :
+                                      planetName === 'jupiter' ? 'المشتري' :
+                                      planetName === 'saturn' ? 'زحل' :
+                                      planetName === 'uranus' ? 'أورانوس' : 'نبتون';
+                    label.style.color = '#8a9bff';
+                    label.style.backgroundColor = 'rgba(30, 40, 70, 0.7)';
+                    label.style.border = '1px solid rgba(138, 155, 255, 0.3)';
+                    label.style.display = 'none';
+                    document.body.appendChild(label);
+                    labels[planetName] = label;
+                });
+                
+                // إعداد مستمعات الأحداث
+                setupEventListeners();
+                
+                // بدء حلقة الرسوم المتحركة
+                animate();
+                
+                // إعداد لوحة المعلومات الأولية
+                updateInfoPanel('sun');
+                
+            } catch (error) {
+                showError("حدث خطأ أثناء تهيئة محاكاة النظام ثلاثي الأبعاد: " + error.message);
+                console.error(error);
+            }
+        }
+        
+        // دالة لتحديث لوحة المعلومات
+        function updateInfoPanel(planetName) {
+            const data = currentPlanetData[planetName].info;
+            const infoPanel = document.getElementById('info-panel');
+            
+            // تحديث اختيار الكوكب في المحدد
+            document.querySelectorAll('.planet-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            document.querySelector(`.planet-option[data-planet="${planetName}"]`).classList.add('selected');
+            
+            // تحديث محتوى لوحة المعلومات
+            infoPanel.innerHTML = `
+                <h1>${data.name}</h1>
+                <h2>الخصائص</h2>
+                <div class="data-row">
+                    <span class="label">النوع:</span>
+                    <span class="value">${data.type}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">القطر:</span>
+                    <span class="value">${data.diameter}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">الكتلة:</span>
+                    <span class="value">${data.mass}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">درجة الحرارة:</span>
+                    <span class="value">${data.temperature}</span>
+                </div>
+                ${data.moons ? `<div class="data-row">
+                    <span class="label">الأقمار:</span>
+                    <span class="value">${data.moons}</span>
+                </div>` : ''}
+                <div class="data-row">
+                    <span class="label">طول اليوم:</span>
+                    <span class="value">${data.dayLength}</span>
+                </div>
+                <div class="data-row">
+                    <span class="label">طول السنة:</span>
+                    <span class="value">${data.yearLength}</span>
+                </div>
+                
+                <h2>التكوين والغلاف الجوي</h2>
+                <p><span class="subtitle">التكوين:</span> ${data.composition}</p>
+                ${data.atmosphere ? `<p><span class="subtitle">الغلاف الجوي:</span> ${data.atmosphere}</p>` : ''}
+                
+                <h2>عن ${data.name}</h2>
+                <p>${data.description}</p>
+            `;
+        }
+        
+        // دالة لتحريك الكاميرا
+        function animateCamera(currentPos, targetPos, controls) {
+            const duration = 1000; // مللي ثانية
+            const startTime = Date.now();
+            const startPosition = currentPos.clone();
+            const endPosition = targetPos;
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // تأثير تسهيل الدخول والخروج
+                const easedProgress = progress < 0.5 
+                    ? 2 * progress * progress 
+                    : -1 + (4 - 2 * progress) * progress;
+                
+                camera.position.x = startPosition.x + (endPosition.x - startPosition.x) * easedProgress;
+                camera.position.y = startPosition.y + (endPosition.y - startPosition.y) * easedProgress;
+                camera.position.z = startPosition.z + (endPosition.z - startPosition.z) * easedProgress;
+                
+                controls.target.set(
+                    endPosition.x * 0.2,
+                    endPosition.y * 0.1,
+                    endPosition.z * 0.2
+                );
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            animate();
+        }
+        
+        // دالة لإعداد مستمعات الأحداث
+        function setupEventListeners() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            // مستمع نقر للكواكب
+            renderer.domElement.addEventListener('click', (event) => {
+                const container = document.getElementById('simulation-container');
+                const rect = container.getBoundingClientRect();
+                
+                // حساب موضع الماوس في إحداثيات الجهاز المعيارية
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                // تحديث شعاع الاختيار مع الكاميرا وموضع الماوس
+                raycaster.setFromCamera(mouse, camera);
+                
+                // حساب الأجسام المتقاطعة مع شعاع الاختيار
+                const intersects = raycaster.intersectObjects(Object.values(planets));
+                
+                if (intersects.length > 0) {
+                    // الحصول على أقرب جسم
+                    const selectedObject = intersects[0].object;
+                    const planetName = selectedObject.userData.name || 'sun';
+                    
+                    if (planetName) {
+                        selectedPlanet = planetName;
+                        updateInfoPanel(planetName);
+                        
+                        // التركيز على الكوكب المحدد
+                        const targetPosition = selectedObject.position.clone();
+                        targetPosition.y += selectedObject.geometry.parameters.radius * 2;
+                        targetPosition.z += selectedObject.geometry.parameters.radius * 3;
+                        
+                        animateCamera(camera.position, targetPosition, controls);
+                        controls.autoRotate = false;
+                    }
+                }
+            }, false);
+            
+            // إعداد خيارات محدد الكواكب
+            document.querySelectorAll('.planet-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    const planetName = option.getAttribute('data-planet');
+                    selectedPlanet = planetName;
+                    updateInfoPanel(planetName);
+                    
+                    // وضع الكاميرا لعرض الكوكب
+                    if (planetName === 'sun') {
+                        camera.position.set(0, 100, 300);
+                        controls.target.set(0, 0, 0);
+                        controls.autoRotate = true;
+                    } else {
+                        const planet = planets[planetName];
+                        const targetPosition = planet.position.clone();
+                        targetPosition.y += planet.geometry.parameters.radius * 3;
+                        targetPosition.z += planet.geometry.parameters.radius * 4;
+                        
+                        animateCamera(camera.position, targetPosition, controls);
+                        controls.autoRotate = false;
+                    }
+                });
+            });
+            
+            // إعداد أزرار التحكم
+            document.getElementById('reset-view').addEventListener('click', () => {
+                camera.position.set(0, 100, 300);
+                controls.target.set(0, 0, 0);
+                controls.autoRotate = true;
+            });
+            
+            document.getElementById('toggle-orbits').addEventListener('click', () => {
+                Object.values(orbitLines).forEach(orbit => {
+                    orbit.visible = !orbit.visible;
+                });
+            });
+            
+            document.getElementById('speed-down').addEventListener('click', () => {
+                simulationSpeed = Math.max(0.1, simulationSpeed - 0.5);
+            });
+            
+            document.getElementById('speed-up').addEventListener('click', () => {
+                simulationSpeed = Math.min(10, simulationSpeed + 0.5);
+            });
+            
+            document.getElementById('toggle-labels').addEventListener('click', () => {
+                labelsVisible = !labelsVisible;
+                Object.values(labels).forEach(label => {
+                    label.style.display = labelsVisible ? 'block' : 'none';
+                });
+            });
+            
+            // إعداد محرر JSON
+            document.getElementById('json-editor-btn').addEventListener('click', () => {
+                // ملء محرر JSON بالبيانات الحالية
+                const jsonTextArea = document.getElementById('json-editor-textarea');
+                jsonTextArea.value = JSON.stringify(currentPlanetData, null, 2);
+                
+                // عرض نافذة المحرر
+                document.getElementById('json-editor-modal').classList.add('visible');
+                
+                // التحقق من صحة JSON عند الكتابة
+                jsonTextArea.addEventListener('input', validateJSON);
+                validateJSON();
+            });
+            
+            // إغلاق المحرر
+            document.getElementById('close-editor').addEventListener('click', () => {
+                document.getElementById('json-editor-modal').classList.remove('visible');
+            });
+            
+            document.getElementById('cancel-edit').addEventListener('click', () => {
+                document.getElementById('json-editor-modal').classList.remove('visible');
+            });
+            
+            // حفظ التغييرات
+            document.getElementById('save-edit').addEventListener('click', () => {
+                try {
+                    const jsonTextArea = document.getElementById('json-editor-textarea');
+                    const newData = JSON.parse(jsonTextArea.value);
+                    
+                    // إعادة تهيئة النظام مع البيانات الجديدة
+                    initSolarSystem(newData);
+                    
+                    // إغلاق المحرر
+                    document.getElementById('json-editor-modal').classList.remove('visible');
+                    
+                    // إظهار رسالة نجاح
+                    alert('تم تحديث بيانات النظام الشمسي بنجاح!');
+                } catch (error) {
+                    alert('خطأ في تنسيق JSON: ' + error.message + '\n\nيرجى تصحيح البيانات قبل الحفظ.');
+                }
+            });
+            
+            // تنسيق JSON
+            document.getElementById('format-json').addEventListener('click', () => {
+                try {
+                    const jsonTextArea = document.getElementById('json-editor-textarea');
+                    const parsed = JSON.parse(jsonTextArea.value);
+                    jsonTextArea.value = JSON.stringify(parsed, null, 2);
+                    validateJSON();
+                } catch (error) {
+                    alert('خطأ في تنسيق JSON: ' + error.message);
+                }
+            });
+            
+            // التحقق من صحة JSON
+            function validateJSON() {
+                const jsonTextArea = document.getElementById('json-editor-textarea');
+                const statusElement = document.getElementById('validation-status');
+                
+                try {
+                    JSON.parse(jsonTextArea.value);
+                    statusElement.textContent = '✓ JSON صالح';
+                    statusElement.className = 'validation-status valid';
+                } catch (error) {
+                    statusElement.textContent = '✗ خطأ في JSON: ' + error.message;
+                    statusElement.className = 'validation-status invalid';
+                }
+            }
+            
+            // معالجة تغيير حجم النافذة
+            window.addEventListener('resize', () => {
+                const container = document.getElementById('simulation-container');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                
+                renderer.setSize(width, height);
+            }, false);
+        }
+        
+        // حلقة الرسوم المتحركة
+        function animate() {
+            animationFrameId = requestAnimationFrame(animate);
+            
+            // تحديث الوقت مع سرعة المحاكاة
+            const time = Date.now() * 0.0005 * simulationSpeed;
+            
+            // تدوير الكواكب حول الشمس
+            Object.keys(currentPlanetData).forEach(planetName => {
+                if (planetName === 'sun') return;
+                
+                const planet = planets[planetName];
+                const data = currentPlanetData[planetName];
+                
+                // حساب الموضع في المدار
+                const angle = time / data.orbitalPeriod;
+                planet.position.x = Math.cos(angle) * data.distance;
+                planet.position.z = Math.sin(angle) * data.distance;
+                
+                // تطبيق الميل
+                planet.position.y = Math.sin(angle) * data.distance * data.inclination;
+                
+                // تدوير الكوكب نفسه
+                planet.rotation.y += data.rotationSpeed * simulationSpeed * 0.05;
+            });
+            
+            // تدوير الشمس
+            planets.sun.rotation.y += currentPlanetData.sun.rotationSpeed * simulationSpeed * 0.1;
+            
+            // تدوير النظام الشمسي بالكامل ببطء للتأثير البصري
+            solarSystem.rotation.y += 0.0001 * simulationSpeed;
+            
+            // تحديث مواضع تسميات الكواكب
+            if (labelsVisible) {
+                Object.keys(labels).forEach(planetName => {
+                    const planet = planets[planetName];
+                    const label = labels[planetName];
+                    
+                    // الحصول على موضع الكوكب في إحداثيات الشاشة
+                    const vector = planet.position.clone().project(camera);
+                    
+                    // رسم الخريطة إلى إحداثيات CSS
+                    const container = document.getElementById('simulation-container');
+                    const rect = container.getBoundingClientRect();
+                    
+                    const x = (vector.x * 0.5 + 0.5) * rect.width + rect.left;
+                    const y = (-vector.y * 0.5 + 0.5) * rect.height + rect.top;
+                    
+                    // وضع التسمية مع إزاحة
+                    label.style.left = `${x}px`;
+                    label.style.top = `${y}px`;
+                });
+            }
+            
+            // تحديث عناصر التحكم
+            controls.update();
+            
+            // عرض المشهد
+            renderer.render(scene, camera);
+        }
+        
+        // التهيئة الأولية
+        if (!isWebGLAvailable()) {
+            showError("متصفحك لا يدعم WebGL. يرجى استخدام متصفح حديث مثل كروم، فايرفوكس، أو إيدج.");
+        } else {
+            // انتظار تحميل الصفحة بالكامل
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    document.getElementById('loading-screen').classList.add('hidden');
+                    initSolarSystem(defaultPlanetData);
+                }, 1200);
+            });
+        }
+    </script>
+</body>
+</html>
+
